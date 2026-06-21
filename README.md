@@ -34,46 +34,63 @@ so this is a separate implementation, not a port.
 
 ## Install
 
-> 🟥 **Run this from the macOS _Terminal_ app — NOT from a terminal inside Claude
-> Desktop (e.g. Claude Code running in the desktop app).** The installer quits
-> Claude Desktop; if you run it from within Claude, you'll kill your own session.
+### Option 1 — Let Claude Code do it (no Terminal) ⭐
+
+Open Claude Code (inside the Claude Desktop app is fine) and tell it:
+
+> Install this for me: https://github.com/NitzanBar1/claude-desktop-rtl-mac
+
+Claude Code will clone the repo and run `install-auto.sh`, which **detaches from
+the app** and then quits Claude, applies the patch, re-signs, and relaunches
+Claude — entirely on its own. Your Claude Code session pauses while Claude
+restarts (~30–60s) and resumes afterward. The agent verifies the result from
+`/tmp/claude-rtl-install.log`. See [`CLAUDE.md`](CLAUDE.md) for the exact agent
+steps.
+
+Why a detached helper? Claude Code running inside Claude Desktop can't quit/re-sign
+its own host without killing its session. `install-auto.sh` solves that by
+re-launching itself in its own process session that survives the restart.
+
+### Option 2 — Manual (Terminal)
+
+> 🟥 Run this from the macOS **Terminal** app — NOT from a terminal inside Claude
+> Desktop. The installer quits Claude Desktop; from within Claude you'd kill your
+> own session.
 
 ```sh
 git clone https://github.com/NitzanBar1/claude-desktop-rtl-mac.git
 cd claude-desktop-rtl-mac
 npm install
 
-# Fully quit Claude Desktop (⌘Q) first, then:
+node patch.mjs --dry-run   # optional: builds + verifies in a temp dir, app untouched
+# then fully quit Claude Desktop (⌘Q) and:
 node patch.mjs
 ```
 
 Reopen Claude Desktop. Hebrew/Arabic messages should now align right-to-left.
 
-### Try it safely first (optional)
-
-A dry run builds and verifies a patched archive in a temp folder **without
-touching the installed app** (safe to run while Claude is open):
-
-```sh
-node patch.mjs --dry-run
-```
+`install-auto.sh` works from a normal terminal too (`bash install-auto.sh`); it
+just isn't required there.
 
 ## Uninstall
 
+Hands-off (via Claude Code or any shell) — same detached restart flow:
+
 ```sh
-# Quit Claude Desktop first, then:
-node unpatch.mjs
+bash install-auto.sh uninstall
 ```
 
-This restores the original `app.asar` and `Info.plist` from the backups the
+Or manually, with Claude Desktop quit, from Terminal: `node unpatch.mjs`.
+
+Either restores the original `app.asar` and `Info.plist` from the backups the
 installer made and re-signs the bundle. To get the *original notarized* build
 back, reinstall Claude from <https://claude.ai/download>.
 
 ## Surviving updates
 
 Claude Desktop auto-updates and each update replaces the app bundle, removing the
-patch (and its backups). After an update, just quit Claude and run `node patch.mjs`
-again.
+patch (and its backups). After an update, just reinstall — `bash install-auto.sh`
+(or tell Claude Code to install it again).
 
 ## How it works
 
@@ -116,12 +133,14 @@ Because `app.asar` changes, the installer also:
 
 ## Files
 
-| File          | Purpose                                                        |
-|---------------|----------------------------------------------------------------|
-| `rtl.js`      | RTL auto-detector injected into the claude.ai page             |
-| `rtl.css`     | Injected stylesheet (alignment; forces code/math LTR)          |
-| `patch.mjs`   | Installer (backup → inject → repack → fix integrity → re-sign) |
-| `unpatch.mjs` | Uninstaller (restore backups → re-sign)                        |
+| File              | Purpose                                                          |
+|-------------------|------------------------------------------------------------------|
+| `install-auto.sh` | Detached install/uninstall orchestrator (no-Terminal path)       |
+| `CLAUDE.md`       | Step-by-step install instructions for a Claude Code agent         |
+| `patch.mjs`       | Installer (backup → inject → repack → fix integrity → re-sign)    |
+| `unpatch.mjs`     | Uninstaller (restore backups → re-sign)                          |
+| `rtl.js`          | RTL auto-detector injected into the claude.ai page               |
+| `rtl.css`         | Injected stylesheet (alignment; forces code/math LTR)            |
 
 ## License
 
