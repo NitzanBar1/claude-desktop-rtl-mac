@@ -35,6 +35,11 @@ process so it survives Claude restarting.
    ```
    Success looks like `patch applied OK` and `[✓] done` in the log, and
    `INSTALLED` from the grep.
+   The installer is fail-safe: if the log shows `rolled back` or the patch
+   failed, the app was automatically restored to the original notarized build
+   (it is NOT broken). The usual cause is macOS App Management blocking
+   code-signing — tell the user to enable *System Settings → Privacy & Security
+   → App Management* for the relevant app and retry.
 5. Tell the user it's installed and to try a Hebrew chat. Note that Claude
    Desktop auto-updates and each update reverts the patch — re-running
    `bash install-auto.sh` reinstalls it.

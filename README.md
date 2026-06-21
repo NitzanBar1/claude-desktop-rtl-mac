@@ -30,7 +30,12 @@ so this is a separate implementation, not a port.
 
 - macOS with **Claude Desktop** installed at `/Applications/Claude.app`.
 - **Node.js 18+** (`node` and `npm` on your `PATH`).
-- Write access to `/Applications/Claude.app` (the default for a user-installed app).
+- Permission to modify the app bundle. On macOS Sonoma+ the **App Management**
+  privacy control governs this. If you install from **Terminal**, grant it once:
+  *System Settings → Privacy & Security → App Management → enable for Terminal*,
+  then quit & reopen Terminal. (The Claude Code path usually already has access.)
+  If signing is ever blocked, the installer **rolls the app back automatically** —
+  it never leaves Claude in a broken state (see [Safety](#safety)).
 
 ## Install
 
@@ -119,6 +124,20 @@ Because `app.asar` changes, the installer also:
    that set changes.
 3. Ad-hoc re-signs the top-level bundle (`codesign --sign -`). The nested helper
    apps keep their original Anthropic signatures.
+
+## Safety
+
+The installer is fail-safe. Before changing anything it backs up the original
+`app.asar`, `Info.plist`, main executable and `_CodeSignature` to
+`~/Library/Application Support/claude-rtl-patch/` (outside the bundle). The
+destructive steps (swap → integrity hash → re-sign) are atomic: if **any** of
+them fails — including macOS blocking `codesign` — the app is restored to the
+**byte-identical, still-notarized** original by plain file copy (no `codesign`
+needed). This has been verified end-to-end on a throwaway copy: install,
+uninstall, and a simulated mid-install signing failure all leave a valid bundle.
+
+If Claude somehow still won't launch, reinstalling from
+<https://claude.ai/download> always restores a clean app.
 
 ## Caveats
 

@@ -1,47 +1,64 @@
 #!/usr/bin/env node
 /* Claude Desktop RTL patch — uninstaller (macOS).
  *
- * Restores the pristine app.asar and Info.plist from the backups the installer
- * made, then ad-hoc re-signs so the restored bundle launches.
- *
- * Note: the original Anthropic Developer ID signature cannot be recreated. This
- * restores Claude's *behavior* to stock. For a fully notarized bundle again,
- * reinstall Claude from https://claude.ai/download .
+ * Restores the original app.asar, Info.plist and _CodeSignature from the backup
+ * the installer made OUTSIDE the bundle. This is a pure file copy, so it brings
+ * back the original *notarized* Anthropic signature and needs no codesign — it
+ * works even if macOS would block re-signing.
  */
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, rmSync } from "node:fs";
+import { cpSync, copyFileSync, chmodSync, statSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 const APP = process.env.CLAUDE_APP || "/Applications/Claude.app";
-const RES = join(APP, "Contents", "Resources");
-const ASAR = join(RES, "app.asar");
-const BAK = join(RES, "app.asar.rtlbak");
-const META = join(RES, ".rtl-patch.json");
+const ASAR = join(APP, "Contents", "Resources", "app.asar");
 const INFO = join(APP, "Contents", "Info.plist");
-const INFO_BAK = INFO + ".rtlbak";
+const CS = join(APP, "Contents", "_CodeSignature");
+const BACKUP_DIR = process.env.RTL_BACKUP_DIR ||
+  join(homedir(), "Library", "Application Support", "claude-rtl-patch");
+const B_ASAR = join(BACKUP_DIR, "app.asar.orig");
+const B_INFO = join(BACKUP_DIR, "Info.plist.orig");
+const B_CS = join(BACKUP_DIR, "_CodeSignature.orig");
+const B_EXE = join(BACKUP_DIR, "main-exe.orig");
+const MAIN_EXE = (() => {
+  try { return join(APP, "Contents", "MacOS", JSON.parse(readFileSync(join(BACKUP_DIR, "backup.json"), "utf8")).mainExe.split("/").pop()); }
+  catch { return join(APP, "Contents", "MacOS", "Claude"); }
+})();
 
 const die = (m) => { console.error("✗ " + m); process.exit(1); };
 const ok = (m) => console.log("✓ " + m);
 
-if (!existsSync(BAK)) die(`No backup at ${BAK}. Nothing to restore (or already removed). To fully reset, reinstall Claude.`);
-
-copyFileSync(BAK, ASAR);
-ok("restored pristine app.asar");
-
-if (existsSync(INFO_BAK)) {
-  copyFileSync(INFO_BAK, INFO);
-  ok("restored Info.plist");
-  rmSync(INFO_BAK, { force: true });
+function claudeRunning() {
+  try { execFileSync("pgrep", ["-f", join(APP, "Contents", "MacOS", "Claude")], { stdio: "ignore" }); return true; }
+  catch { return false; }
 }
 
-rmSync(BAK, { force: true });
-rmSync(META, { force: true });
-ok("removed patch backups/metadata");
+if (![B_ASAR, B_INFO, B_CS, B_EXE].every(existsSync))
+  die(`No (complete) backup found in ${BACKUP_DIR}.\n  If the app is patched, reinstall Claude from https://claude.ai/download.`);
+if (claudeRunning())
+  die("Claude Desktop is running. Quit it (⌘Q) first (or use `bash install-auto.sh uninstall`).");
 
-execFileSync("codesign", ["--remove-signature", APP], { stdio: "ignore" });
-execFileSync("codesign", ["--force", "--sign", "-", APP]);
-execFileSync("codesign", ["--verify", "--verbose=2", APP], { stdio: "inherit" });
-ok("re-signed (ad-hoc) and verified");
+try {
+  copyFileSync(B_ASAR, ASAR);
+  copyFileSync(B_INFO, INFO);
+  copyFileSync(B_EXE, MAIN_EXE);
+  chmodSync(MAIN_EXE, statSync(B_EXE).mode);
+  rmSync(CS, { recursive: true, force: true });
+  cpSync(B_CS, CS, { recursive: true });
+  ok("restored original app.asar, Info.plist, main executable and signature");
+} catch (e) {
+  die("restore failed: " + ((e && (e.stderr?.toString() || e.message)) || e) +
+      "\n  Reinstall Claude from https://claude.ai/download if it won't launch.");
+}
 
+try {
+  execFileSync("codesign", ["--verify", "--strict", APP], { stdio: "ignore" });
+  ok("verified restored signature (original notarized build)");
+} catch {
+  console.error("⚠️  signature verify failed after restore — if Claude won't open, reinstall from https://claude.ai/download");
+}
+
+// best-effort: drop the now-unneeded backup
+rmSync(BACKUP_DIR, { recursive: true, force: true });
 console.log("\n✅ RTL patch removed. Fully quit Claude (⌘Q) and reopen.");
-console.log("   For the original notarized build, reinstall from https://claude.ai/download");
