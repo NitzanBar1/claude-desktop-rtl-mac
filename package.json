@@ -1,0 +1,14 @@
+{
+  "name": "claude-desktop-rtl-mac",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "RTL (Hebrew/Arabic) patch for Claude Desktop on macOS",
+  "scripts": {
+    "install-patch": "node patch.mjs",
+    "uninstall-patch": "node unpatch.mjs"
+  },
+  "dependencies": {
+    "@electron/asar": "^4.0.0"
+  }
+}

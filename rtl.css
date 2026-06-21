@@ -1,0 +1,43 @@
+/* Claude Desktop RTL patch — injected stylesheet (macOS).
+   Only elements our JS tags with [data-claude-rtl] are affected, so we never
+   fight Claude's own layout. Code and math are forced LTR regardless. */
+
+[data-claude-rtl="rtl"] {
+  direction: rtl !important;
+  text-align: right !important;
+}
+[data-claude-rtl="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* Mixed-script blocks: let each line resolve its own direction. */
+[data-claude-rtl="auto"] {
+  unicode-bidi: plaintext !important;
+  text-align: start !important;
+}
+
+/* Code, preformatted text and math must never flip. */
+pre,
+pre *,
+code,
+kbd,
+samp,
+.katex,
+.katex-display,
+[data-claude-rtl] pre,
+[data-claude-rtl] code,
+[data-claude-rtl] .katex {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left !important;
+}
+
+/* Inline code inside RTL text: isolate so brackets/operators don't scramble. */
+:not(pre) > code {
+  unicode-bidi: isolate;
+}
+
+/* The message composer (textarea / contenteditable) gets its dir set live by JS;
+   this keeps the caret and placeholder aligned with the chosen direction. */
+[data-claude-rtl="rtl"]::placeholder { text-align: right; }
